@@ -1,6 +1,6 @@
 # CRDT notes
 
-Excerpts collected from papers and articles published on the Web. Please submit any corrections as PRs.
+Excerpts collected from papers and articles published on the Web.
 
 
 
