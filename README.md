@@ -1,30 +1,6 @@
 # CRDT notes
 
-Collected excerpts and personal notes from papers and articles published on the Web. Please submit any corrections as PRs.
-
-
-
-## Eventual Consistency
-
-From ["Eventual Consistency Today: Limitations, Extensions, and Beyond"](http://queue.acm.org/detail.cfm?id=2462076)
-
-> Given the CAP impossibility result, distributed-database designers sought weaker consistency models that would enable both availability and high performance. While weak consistency has been studied and deployed in various forms since the 1970s, the eventual consistency model has become prominent, particularly among emerging, highly scalable NoSQL stores.
-
-> One of the earliest definitions of eventual consistency comes from a 1988 paper describing a group communication system not unlike a shared text editor such as Google Docs today: "...changes made to one copy eventually migrate to all. If all update activity stops, after a period of time all replicas of the database will converge to be logically equivalent: each copy of the database will contain, in a predictable order, the same documents; replicas of each document will contain the same fields."
-
-> Under eventual consistency, all servers eventually "converge" to the same state; at some point in the future, servers are indistinguishable from one another. This eventual convergence, however, does not provide Single-System Image semantics. First, the "predictable order" will not necessarily correspond to an execution that could have arisen under SSI; eventual consistency does not specify which value is eventually chosen. Second, there is an unspecified window before convergence is reached, during which the system will not provide SSI semantics, but rather arbitrary values. As will be seen shortly, this promise of eventual convergence is a rather weak property. Finally, a system with SSI provides eventual consistency—the "eventuality" is immediate—but not vice versa.
-
-> Why is eventual consistency useful? Pretend you are in charge of the data infrastructure at a social network where users post new status updates that are sent to their followers' timelines, represented by separate lists—one per user. Because of large scale and frequent server failures, the database of timelines is stored across multiple physical servers. In the event of a partition between two servers, however, you cannot deliver each update to all timelines. What should you do? Should you tell the user that he or she cannot post an update, or should you wait until the partition heals before providing a response? Both of these strategies choose consistency over availability, at the cost of user experience.
-
-> Instead, what if you propagate the update to the reachable set of followers' timelines, return to the user, and delay delivering the update to the other followers until the partition heals? In choosing this option, you give up the guarantee that all users see the same set of updates at every point in time (and admit the possibility of timeline reordering as partitions heal), but you gain high availability and (arguably) a better user experience. Moreover, because updates are eventually delivered, all users eventually see the same timeline with all of the updates that users posted.
-
-### Implementing Eventual Consistency
-
-> A key benefit of eventual consistency is that it is fairly straightforward to implement. To ensure convergence, replicas must exchange information with one another about which writes they have seen. This information exchange is often called anti-entropy, a homage to the process of reversing entropy, or thermodynamic randomness, in a physical system. Protocols for achieving anti-entropy take a variety of forms; one simple solution is to use an asynchronous all-to-all broadcast: when a replica receives a write to a data item, it immediately responds to the user, then, in the background, sends the write to all other replicas, which in turn update their locally stored data items. In the event of concurrent writes to a given data item, replicas deterministically choose a "winning" value, often using a simple rule such as "last writer wins" (e.g., via a clock value embedded in each write).
-
-> Suppose you want to make a single-node database into an eventually consistent distributed database. When you get a request, you route it to any server you can contact. When a server performs a write to its local key-value store, it can send the write to all other servers in the cluster. This write-forwarding becomes the anti-entropy process. Be careful, however, when sending the write to the other servers. If you wait for other servers to respond before acknowledging the local write, then, if another server is down or partitioned from you, the write request will hang indefinitely. Instead, you should send the request in the background; anti-entropy should be an asynchronous process. Implicitly, the model for eventual consistency assumes that system partitions are eventually healed and updates are eventually propagated, or that partitioned nodes eventually die and the system ends up operating in a single partition.
-
-> The eventually consistent system has some great properties. It does not require writing difficult "corner-case" code to deal with complicated scenarios such as downed replicas or network partitions—anti-entropy will simply stall—or writing complex code for coordination such as master election. All operations complete locally, meaning latency will be bounded. In a geo-replicated scenario, with replicas located in different data centers, you don't have to endure long-haul wide-area network latencies on the order of hundreds of milliseconds on the request fast path. The mechanism just described, returning immediately on the local write, can put data durability at risk. An intermediate point in trading between durability and availability is to return after W replicas have acknowledged the write, thus allowing the write to survive W-1 replica failures. Anti-entropy can be run as often or as rarely as desired without violating any guarantees. What's not to like?
+Excerpts collected from papers and articles published on the Web. Please submit any corrections as PRs.
 
 
 
@@ -32,7 +8,7 @@ From ["Eventual Consistency Today: Limitations, Extensions, and Beyond"](http://
 
 From ["Key-CRDT Stores"](http://run.unl.pt/bitstream/10362/7802/1/Sousa_2012.pdf) (the Swiftcloud paper)
 
-### 2.1.1 - Replication
+### Replication
 
 #### Pessimistic vs. Optimistic Replication
 
@@ -54,7 +30,7 @@ From ["Key-CRDT Stores"](http://run.unl.pt/bitstream/10362/7802/1/Sousa_2012.pdf
 
 > There are two fundamental methods to propagate updates among replicas. In State based replication, updates contain the full object state (or in optimized versions, a delta of the state). In operation based, the updates contain the operations that modify the object and must be executed in all replicas. The size of an object is typically larger than the size of an operation. Transmitting the whole state of an object can introduce a large overhead in message size. On the other hand, if the number of operations is high it can be better to transmit the whole state instead of all operations. Also, it can be simpler to update the state of an object than applying the operations on it, as discussed in 2.1.5.
 
-### 2.1.3 - Correctness Criteria
+### Correctness Criteria
 
 > Pessimistic replication systems usually impose strong correctness criteria such as linearizability or serializability. The concurrent execution of operations in a replicated shared object is said to be linearizable if operation appear to have executed atomically, in some sequential order that is consistent with the real time at which the operations occurred in the real execution.
 
@@ -64,9 +40,9 @@ From ["Key-CRDT Stores"](http://run.unl.pt/bitstream/10362/7802/1/Sousa_2012.pdf
 
 > For optimistic replication, several weaker correctness properties have been defined:
 
-> **Eventual convergence property**: copies of shared objects are identical at all sites if updates cease and all generated updates are propagated to all sites. (*"Eventually consistent" -pfraze*)
+> **Eventual convergence property**: copies of shared objects are identical at all sites if updates cease and all generated updates are propagated to all sites.
 
-> **Precedence property**: if one update `Oa` causally precedes another update `Ob`, then, at each site, the execution of `Oa` happens before the execution of `Ob`. (*"Causally consistent" -pfraze*)
+> **Precedence property**: if one update `Oa` causally precedes another update `Ob`, then, at each site, the execution of `Oa` happens before the execution of `Ob`.
 
 > **Intention-preservation**: for any update `O`, the effect of executing `O` at all sites is the same as the intention of `O` when executed at the site that originated it, and the effect of executing `O` does not change the effect of non concurrent operations.
 
@@ -142,26 +118,6 @@ From ["Eventual Consistency Today: Limitations, Extensions, and Beyond"](http://
 
 
 
-## Monotic programs
-
-From ["Consistency Analysis in Bloom: a CALM and Collected Approach"](http://db.cs.berkeley.edu/papers/cidr11-bloom.pdf)
-
-### Section 2
-
-> A key problem in distributed programming is reasoning about the consistent behavior of a program in the face of temporal nondeter-minism: the delay and re-ordering of messages and data across nodes. Because delays can be unbounded, analysis typically focuses on “eventual consistency” after all messages have been delivered. A sufficient condition for eventual consistency is order independence: the independence of program execution from temporal nondeterminism.
-
-> Monotonic programs—e.g., programs expressible via selection, projection and join (even with recursion)—can be implemented by streaming algorithms that incrementally produce output elements as they receive input elements. The final order or contents of the input will never cause any earlier output to be “revoked” once it has been generated. Non-monotonic programs—e.g., those that contain aggregation or negation operations—can only be implemented correctly via blocking algorithms that do not produce any output until they have received all tuples in logical partitions of an input set. For example, aggregation queries need to receive entire “groups” before producing aggregates, which in general requires receiving the entire input set.
-
-> The implications for distributed programming are clear. Monotonic programs are easy to distribute: they can be implemented via streaming set-based algorithms that produce actionable outputs to consumers while tolerating message reordering and delay from producers. By contrast, even simple non-monotonic tasks like counting are difficult in distributed systems. As a mnemonic, we say that counting requires waiting in a distributed system: in general, a complete count of distributed data must wait for all its inputs, including stragglers, before producing the correct output.
-
-> “Waiting” is specified in a program via coordination logic: code that (a) computes and transmits auxiliary information from producers to enable the recipient to determine when a set has completely arrived across the network, and (b) postpones production of results for consumers until after that determination is made. Typical coordination mechanisms include sequence numbers, counters, and consensus protocols like Paxos or Two-Phase Commit.
-
-> Interestingly, these coordination mechanisms themselves typically involve counting. For example, Paxos requires counting messages to establish that a majority of the members have agreed to a proposal; Two-Phase Commit requires counting to establish that all members have agreed. Hence we also say that waiting requires counting, the converse of our earlier mnemonic.
-
-> Our observations about waiting and counting illustrate the crux of what we call the CALM principle: the tight relationship between Consistency And Logical Monotonicity. Monotonic programs guarantee eventual consistency under any interleaving of delivery and computation. By contrast, non-monotonicity—the property that adding an element to an input set may revoke a previously valid element of an output set—requires coordination schemes that “wait” until inputs can be guaranteed to be complete.
-
-
-
 ## Convergence
 
 From ["A comprehensive study of Convergent and Commutative Replicated Data Types"](http://hal.upmc.fr/docs/00/55/55/88/PDF/techreport.pdf), summarized:
@@ -178,7 +134,7 @@ An ops-based CRDT (CmRDT) must...
 
  - Have a partial order to the operations.
  - Have a reliable broadcast channel which guarantees that operations are delivered in the partial order.
- - Define the operation such that concurrent ops (ops which have an equivalent order) commute, meaning they can yield a predictable result without clear precedence.
+ - Define the operation such that concurrent ops commute, meaning they can yield a predictable result without clear precedence.
 
 With these semantics, updates from nodes can converge deterministically.
 
