@@ -177,7 +177,7 @@ One of the simplest types. The available operations are `increment` and `decreme
 
 > It is not straightforward to support decrement with the previous representation, because this operation would violate monotonicity of the semilattice. Furthermore, since merge is a max operation, decrement would have no effect.
 
-> Our solution, PN-Counter basically combines two G-Counters. Its payload consists of two vectors: P to register increment s, and N for decrement s. Its value is the difference between the two corresponding G-Counters, its partial order is the conjunction of the corresponding partial orders, and merge merges the two vectors.
+> Our solution, PN-Counter basically combines two G-Counters. Its payload consists of two vectors: P to register increments, and N for decrements. Its value is the difference between the two corresponding G-Counters, its partial order is the conjunction of the corresponding partial orders, and merge merges the two vectors.
 
 ### Notes on non-negative counters
 
@@ -380,5 +380,8 @@ Riak uses a novel set type they call ORSWOT. From their code's documentation:
 
 > When an element exists in replica A and not replica B, is it because A added it and B has not yet seen that, or that B removed it and A has not yet seen that? Usually the presence of a tombstone arbitrates. In this implementation we compare the "birth dot" of the present element to the clock in the Set it is absent from. If the element dot is not "seen" by the Set clock, that means the other set has yet to see this add, and the item is in the merged Set. If the Set clock dominates the dot, that means the other Set has removed this element already, and the item is not in the merged Set.
 
+The Remove operation in Riak uses a "Context" object, which is a set of Observed tags (per the OR-set design). The client fetches the most recent tags with a get, then executes the remove with the Context attached. There are two purposes to this:
 
-Their Remove semantics will error if the value isn't there. This requires coordination in the form of a "context" given by the client. The context ensures that the node can find the element if it doesn't have it yet. It's also possible that a concurrent add and remove (without the context to help) could result in "Remove wins," which breaks their concurrency semantic. This fits the CALM premise: the Add operation is monotonic, but the Update/Remove operations are non-monotonic and require coordination.
+ 1. The receiving replica may not have observed the same value-tags yet. If it hadn't observed any tags for the value, it would return an error saying "precondition failed" (not found, basically). Including the Context (Observed tag set) ensures that the replica is able to remove.
+
+ 2. The receiving replica may have observed *more* value-tags than the client has. Without the Context, the replica would delete more value-tags than the client had observed, causing a sort of "remove-wins" scenario. Since the OR-set is defined as "add-wins," this is bad behavior: it's better to include the Context to ensure the intended semantics.
