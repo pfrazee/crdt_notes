@@ -232,7 +232,7 @@ To illustrate the non-commutative property:
  - `add(a) + remove(a) = noop`
  - `remove(a) + add(a) = add(a)`
 
-Therefore, a concurrent and and remove would be non-deterministic.
+Therefore, a concurrent `add` and `remove` would be non-deterministic.
 
 ### Grow-Only Set (G-Set)
 
